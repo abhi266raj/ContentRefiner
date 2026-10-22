@@ -40,6 +40,8 @@ jobs:
         run: Scripts/verify-products.sh
       - name: Shared app-model tests
         run: swift test --package-path Packages/ContentRefinerBase -c release
+      - name: Mac startup regression tests
+        run: swift test --package-path Packages/ContentRefinerMac -c release
       - name: Build and package shared comparison app
         run: Scripts/build-app.sh
       - uses: actions/upload-artifact@v4
@@ -54,9 +56,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: swift-actions/setup-swift@v2
+      - uses: swift-actions/setup-swift@v3
         with:
-          swift-version: '6.2.3'
+          swift-version: '6.4.1'
       - name: Install GTK desktop dependencies
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev clang xvfb
       - name: Deterministic SDK tests

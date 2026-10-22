@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import Foundation
 import SwiftCrossUI
 
 /// Shared comparison surface; platform packages supply providers, not duplicated layouts.
@@ -11,6 +12,7 @@ public struct ComparisonView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
+                Image(Bundle.module.url(forResource: "ContentRefiner", withExtension: "png")!).resizable().frame(width: 48, height: 48)
                 VStack(alignment: .leading) {
                     Text("Content Refiner").font(.title).bold()
                     Text("One original. Better with every pass.").foregroundColor(.gray)

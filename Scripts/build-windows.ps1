@@ -16,6 +16,7 @@ if (Test-Path $swiftRoot) {
     Get-ChildItem $swiftRoot -Recurse -File -Filter '*.dll' | Where-Object { $_.Name -match '^(swift|Foundation|BlocksRuntime|dispatch|icu|_Foundation|Observation)' } | ForEach-Object { Copy-Item $_.FullName $output -Force }
 }
 Get-ChildItem $products -Directory | Where-Object { $_.Name -like '*.resources' } | Copy-Item -Destination $output -Recurse
+Copy-Item Assets/ContentRefiner.png, Assets/ContentRefiner.ico $output
 Copy-Item LICENSE, THIRD_PARTY_NOTICES.md $output
 'Run ContentRefinerWindows.exe. A matching Windows App Runtime for SwiftCrossUI WinUIBackend must be installed; see README.' | Set-Content "$output/README.txt"
 Compress-Archive -Path "$output/*" -DestinationPath "$output.zip" -Force

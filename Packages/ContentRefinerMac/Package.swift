@@ -10,4 +10,5 @@ let package = Package(name: "ContentRefinerMac", platforms: [.macOS("26.0")],
     ], targets: [
         .target(name: "ContentRefinerMacProviders", dependencies: [.product(name: "ContentRefiner", package: "ContentRefiner"), .product(name: "ContentRefinerBase", package: "ContentRefinerBase"), .product(name: "AgentAtom", package: "AgentAtom"), .product(name: "TerminalAgentSession", package: "TerminalAgentSession")]),
         .executableTarget(name: "ContentRefinerMacApp", dependencies: ["ContentRefinerMacProviders", .product(name: "ContentRefinerBase", package: "ContentRefinerBase"), .product(name: "SwiftCrossUI", package: "swift-cross-ui"), .product(name: "DefaultBackend", package: "swift-cross-ui"), .product(name: "AppKitBackend", package: "swift-cross-ui")])
+        , .testTarget(name: "ContentRefinerMacTests", dependencies: ["ContentRefinerMacApp"])
     ], swiftLanguageModes: [.v6])
