@@ -94,6 +94,9 @@ jobs:
       - name: Verify portable command
         shell: pwsh
         run: swift run content-refiner --help
+      - name: Validate standalone Windows runtime packaging
+        shell: pwsh
+        run: Scripts/test-windows-runtime.ps1
       - name: Shared app-model tests
         shell: pwsh
         run: swift test --package-path Packages/ContentRefinerBase -c release

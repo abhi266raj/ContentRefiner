@@ -13,7 +13,7 @@ function Get-PeMachine([string] $Path) {
     } finally { $reader.Dispose() }
 }
 
-function Copy-WindowsRuntime([string] $Products, [string] $Output, [string] $BuildRoot) {
+function Copy-WindowsRuntime([string] $Products, [string] $Output, [string] $BuildRoot, [string] $ExecutableName = 'ContentRefinerWindows.exe') {
     $targetInfo = (& swiftc -print-target-info | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0) { throw 'Could not inspect Swift runtime paths' }
     $swiftBinary = (Get-Command swiftc).Source
@@ -25,7 +25,7 @@ function Copy-WindowsRuntime([string] $Products, [string] $Output, [string] $Bui
         elseif (Test-Path $_ -PathType Leaf) { Split-Path (Split-Path $_) }
     } | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique)
     if (-not $roots) { throw 'No installed Swift runtime directories were found' }
-    $machine = Get-PeMachine (Join-Path $Output 'ContentRefinerWindows.exe')
+    $machine = Get-PeMachine (Join-Path $Output $ExecutableName)
     if (-not $machine) { throw 'The app is not a valid Windows executable' }
     $candidates = @{}
     $candidateFiles = @(Get-ChildItem $Products -File -Filter '*.dll')
@@ -66,8 +66,6 @@ function Copy-WindowsRuntime([string] $Products, [string] $Output, [string] $Bui
         }
     }
     if ($missing.Count) { throw "Unbundled non-system runtime dependencies: $($missing -join ', ')" }
-    $bootstrapper = Get-ChildItem $Output -Recurse -File -Filter 'Microsoft.WindowsAppRuntime.Bootstrap.dll' | Select-Object -First 1
-    if (-not $bootstrapper -or (Get-PeMachine $bootstrapper.FullName) -ne $machine) { throw 'Windows App SDK bootstrap resource is missing or has the wrong architecture' }
     if (-not (Test-Path (Join-Path $Output 'swiftCore.dll'))) { throw 'Swift runtime was not bundled' }
     Write-Host "Validated runtime import closure for $($seen.Count) executable/DLL files."
     return $roots

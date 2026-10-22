@@ -14,6 +14,8 @@ Get-ChildItem $products -Filter '*.dll' | Copy-Item -Destination $output
 Get-ChildItem $products -Directory | Where-Object { ($_.Name -like '*.resources' -or $_.Name -like '*.bundle') } | Copy-Item -Destination $output -Recurse
 if (-not (Get-ChildItem $output -Recurse -File -Filter 'ContentRefiner.png' | Where-Object { $_.FullName -match 'ContentRefinerBase_ContentRefinerBase' })) { throw 'Shared UI resource bundle is missing' }
 $swiftRoots = @(Copy-WindowsRuntime -Products $products -Output $output -BuildRoot "$package/.build")
+$bootstrapper = Get-ChildItem $output -Recurse -File -Filter 'Microsoft.WindowsAppRuntime.Bootstrap.dll' | Select-Object -First 1
+if (-not $bootstrapper -or (Get-PeMachine $bootstrapper.FullName) -ne (Get-PeMachine "$output/ContentRefinerWindows.exe")) { throw 'Windows App SDK bootstrap resource is missing or has the wrong architecture' }
 Copy-Item Assets/ContentRefiner.png, Assets/ContentRefiner.ico $output
 Copy-Item LICENSE, THIRD_PARTY_NOTICES.md $output
 'Run ContentRefinerWindows.exe. The Visual C++ x64 runtime and matching Windows App Runtime for SwiftCrossUI WinUIBackend must be installed; see README.' | Set-Content "$output/README.txt"
