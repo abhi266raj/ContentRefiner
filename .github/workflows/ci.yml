@@ -62,7 +62,7 @@ jobs:
         with:
           swift-version: '6.4.1'
       - name: Install GTK desktop dependencies
-        run: sudo apt-get update && sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends libgtk-4-dev clang
+        run: sudo apt-get update && sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends libgtk-4-dev clang xvfb xauth
       - name: Deterministic SDK tests
         run: swift test
       - name: Verify portable command
@@ -71,6 +71,8 @@ jobs:
         run: swift test --package-path Packages/ContentRefinerBase -c release
       - name: Build Linux shared comparison app
         run: Scripts/build-portable.sh Linux
+      - name: Smoke-test packaged Linux app
+        run: Scripts/smoke-linux.sh
       - uses: actions/upload-artifact@v4
         with:
           name: ContentRefinerLinux-dist
