@@ -9,6 +9,10 @@ changes="$(mktemp)"
 notes="$(mktemp)"
 trap 'rm -f "$changes" "$notes"' EXIT
 ruby Scripts/versions.rb "${1:-}" > "$changes"
+# Validate every changed app artifact before creating any immutable tags.
+ruby -rjson -e 'JSON.parse(File.read(ARGV[0])).each{|x| case x["name"]; when "ContentRefinerMac"; puts "dist/ContentRefinerMac-#{x["version"]}.zip", "dist/ContentRefinerMac-#{x["version"]}.dmg"; when "ContentRefinerLinux"; puts "dist/ContentRefinerLinux-#{x["version"]}.tar.gz"; when "ContentRefinerWindows"; puts "dist/ContentRefinerWindows-#{x["version"]}.zip"; end}' "$changes" > "$changes.assets"
+trap 'rm -f "$changes" "$changes.assets" "$notes"' EXIT
+while IFS= read -r asset; do test -s "$asset" || { echo "Missing verified artifact: $asset" >&2; exit 1; }; done < "$changes.assets"
 ruby -rjson -e 'JSON.parse(File.read(ARGV[0])).each{|x|puts [x["name"],x["version"],x["tag"]].join(" ")}' "$changes" |
 while read -r name version tag; do
   existing="$(git rev-parse --verify "refs/tags/$tag^{commit}" 2>/dev/null || true)"
@@ -24,7 +28,7 @@ while read -r name version tag; do
     ContentRefinerMac) assets=("dist/ContentRefinerMac-$version.zip" "dist/ContentRefinerMac-$version.dmg");;
     ContentRefinerLinux) assets=("dist/ContentRefinerLinux-$version.tar.gz");;
     ContentRefinerWindows) assets=("dist/ContentRefinerWindows-$version.zip");;
-    ContentRefiner) while IFS= read -r file; do assets+=("$file"); done < <(find dist -maxdepth 1 -type f \( -name '*.zip' -o -name '*.dmg' -o -name '*.tar.gz' \) | sort);;
+    ContentRefiner) while IFS= read -r file; do assets+=("$file"); done < "$changes.assets";;
   esac
   for asset in "${assets[@]}"; do test -s "$asset"; done
   gh release create "$tag" "${assets[@]}" --repo "$repo" --verify-tag --title "$name $version" --notes-file "$notes" --latest=false

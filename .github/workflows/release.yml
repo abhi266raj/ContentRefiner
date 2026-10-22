@@ -32,7 +32,9 @@ jobs:
         id: verified
         env:
           GH_TOKEN: ${{ github.token }}
-        run: echo "run=$(Scripts/verified-pr-build.sh)" >> "$GITHUB_OUTPUT"
+        run: |
+          verified_run="$(Scripts/verified-pr-build.sh)"
+          echo "run=$verified_run" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         if: steps.versions.outputs.release == 'true'
         with:
