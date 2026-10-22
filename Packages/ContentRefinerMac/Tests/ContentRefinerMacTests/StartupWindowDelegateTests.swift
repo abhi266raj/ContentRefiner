@@ -11,12 +11,17 @@ private final class TestWindow: NSWindow {
 private final class Delegate: NSObject, NSWindowDelegate {
     var resize: (() -> Void)?
     var calls = 0
+    var closes = 0
+    let undo = UndoManager()
     func windowWillResize(_ sender: NSWindow, to size: NSSize) -> NSSize {
         calls += 1; resize?(); return size
     }
+    func windowWillClose(_ notification: Notification) { closes += 1 }
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { undo }
 }
 final class StartupWindowDelegateTests: XCTestCase {
     @MainActor func testInitialDisplayDoesNotReenterLayoutAndLaterResizesAreForwardedOnce() {
+        _ = NSApplication.shared
         let window = TestWindow(contentRect: .init(x: 0, y: 0, width: 900, height: 680), styleMask: [.titled, .resizable], backing: .buffered, defer: true)
         let original = Delegate()
         window.delegate = original
@@ -31,5 +36,8 @@ final class StartupWindowDelegateTests: XCTestCase {
         XCTAssertEqual(original.calls, 1)
         guardDelegate.install(on: window)
         XCTAssertTrue(window.delegate === guardDelegate)
+        guardDelegate.windowWillClose(Notification(name: NSWindow.willCloseNotification, object: window))
+        XCTAssertEqual(original.closes, 1)
+        XCTAssertTrue(guardDelegate.windowWillReturnUndoManager(window) === original.undo)
     }
 }

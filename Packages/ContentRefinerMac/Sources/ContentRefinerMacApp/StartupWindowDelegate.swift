@@ -20,11 +20,11 @@ final class StartupWindowDelegate: NSObject, NSWindowDelegate {
         return original?.windowWillResize?(sender, to: frameSize) ?? frameSize
     }
 
-    override func responds(to selector: Selector!) -> Bool {
-        super.responds(to: selector) || original?.responds(to: selector) == true
+    func windowWillClose(_ notification: Notification) {
+        original?.windowWillClose?(notification)
     }
 
-    override func forwardingTarget(for selector: Selector!) -> Any? {
-        original?.responds(to: selector) == true ? original : super.forwardingTarget(for: selector)
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
+        original?.windowWillReturnUndoManager?(window)
     }
 }
