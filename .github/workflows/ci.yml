@@ -1,7 +1,5 @@
 name: CI
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -15,23 +13,14 @@ jobs:
     name: Mac SDK and shared app
     runs-on: macos-26
     timeout-minutes: 45
-    outputs:
-      release: ${{ steps.versions.outputs.release }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Check independent component versions
-        id: versions
         env:
-          BEFORE: ${{ github.event.before }}
           BASE: ${{ github.event.pull_request.base.sha }}
-          EVENT: ${{ github.event_name }}
-        run: |
-          changes="$(ruby Scripts/versions.rb "${BASE:-$BEFORE}")"
-          release=false
-          if [ "$EVENT" = push ] && [ "$changes" != '[]' ]; then release=true; fi
-          echo "release=$release" >> "$GITHUB_OUTPUT"
+        run: ruby Scripts/versions.rb "$BASE"
       - name: Check release rules and SDK UI boundary
         run: Scripts/test-release.sh
       - name: Deterministic SDK tests
@@ -107,24 +96,3 @@ jobs:
         with:
           name: ContentRefinerWindows-dist
           path: dist/*.zip
-  release:
-    name: Publish increased component versions
-    needs: [mac, linux, windows]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.mac.outputs.release == 'true'
-    runs-on: macos-26
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: ContentRefiner*-dist
-          path: dist
-          merge-multiple: true
-      - name: Publish immutable source tags and platform artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
-        run: Scripts/release.sh "$BEFORE"
