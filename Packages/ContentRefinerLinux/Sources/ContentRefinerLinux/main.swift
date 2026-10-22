@@ -1,0 +1,10 @@
+import SwiftCrossUI
+import DefaultBackend
+import ContentRefinerBase
+@main struct ContentRefinerLinuxApp: App {
+    @State var model = RefinerAppModel()
+    var body: some Scene {
+        WindowGroup("Content Refiner") { ComparisonView(model: model) }
+            .defaultSize(width: 1120, height: 780)
+    }
+}

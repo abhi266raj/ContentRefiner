@@ -1,0 +1,121 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: content-refiner-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  mac:
+    name: Mac SDK and shared app
+    runs-on: macos-26
+    timeout-minutes: 45
+    outputs:
+      release: ${{ steps.versions.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check independent component versions
+        id: versions
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          changes="$(ruby Scripts/versions.rb "${BASE:-$BEFORE}")"
+          release=false
+          if [ "$EVENT" = push ] && [ "$changes" != '[]' ]; then release=true; fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+      - name: Check release rules and SDK UI boundary
+        run: Scripts/test-release.sh
+      - name: Deterministic SDK tests
+        run: swift test
+      - name: Verify public SDK products as isolated consumers
+        run: Scripts/verify-products.sh
+      - name: Shared app-model tests
+        run: swift test --package-path Packages/ContentRefinerBase -c release
+      - name: Build and package shared comparison app
+        run: Scripts/build-app.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContentRefinerMac-dist
+          path: |
+            dist/*.zip
+            dist/*.dmg
+  linux:
+    name: Linux SDK and shared app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.4.1'
+      - name: Install GTK desktop dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev clang xvfb
+      - name: Deterministic SDK tests
+        run: swift test
+      - name: Verify portable command
+        run: swift run content-refiner --help
+      - name: Shared app-model tests
+        run: swift test --package-path Packages/ContentRefinerBase -c release
+      - name: Build Linux shared comparison app
+        run: Scripts/build-portable.sh Linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContentRefinerLinux-dist
+          path: dist/*.tar.gz
+  windows:
+    name: Windows SDK and shared app
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: seanmiddleditch/gha-setup-vsdevenv@v5
+      - uses: compnerd/gha-setup-swift@v0.5.1
+        with:
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
+      - name: Deterministic SDK tests
+        shell: pwsh
+        run: swift test
+      - name: Verify portable command
+        shell: pwsh
+        run: swift run content-refiner --help
+      - name: Shared app-model tests
+        shell: pwsh
+        run: swift test --package-path Packages/ContentRefinerBase -c release
+      - name: Build Windows shared comparison app
+        shell: pwsh
+        run: Scripts/build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContentRefinerWindows-dist
+          path: dist/*.zip
+  release:
+    name: Publish increased component versions
+    needs: [mac, linux, windows]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.mac.outputs.release == 'true'
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ContentRefiner*-dist
+          path: dist
+          merge-multiple: true
+      - name: Publish immutable source tags and platform artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: Scripts/release.sh "$BEFORE"
