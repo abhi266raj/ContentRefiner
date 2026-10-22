@@ -40,6 +40,7 @@ function Copy-WindowsRuntime([string] $Products, [string] $Output, [string] $Bui
     $queue = [Collections.Generic.Queue[string]]::new()
     Get-ChildItem $Output -Recurse -File | Where-Object { $_.Extension -in @('.exe', '.dll') -and (Get-PeMachine $_.FullName) -eq $machine } | ForEach-Object { $queue.Enqueue($_.FullName) }
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $external = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $missing = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     while ($queue.Count) {
         $file = $queue.Dequeue()
@@ -49,6 +50,8 @@ function Copy-WindowsRuntime([string] $Products, [string] $Output, [string] $Bui
         foreach ($line in $imports) {
             if ($line -match '(?i)^\s+([a-z0-9_.-]+\.dll)\s*$') { $name = $matches[1] } else { continue }
             if ($name -match '^(api-ms-|ext-ms-)' -or (Test-Path (Join-Path $env:SystemRoot "System32/$name"))) { continue }
+            # Windows App SDK's installed framework is activated by its bundled bootstrapper.
+            if ($name -ieq 'Microsoft.WindowsAppRuntime.dll') { [void]$external.Add($name); continue }
             $destination = Join-Path $Output $name
             if (-not (Test-Path $destination)) {
                 if (-not $candidates.ContainsKey($name)) {
@@ -67,6 +70,10 @@ function Copy-WindowsRuntime([string] $Products, [string] $Output, [string] $Bui
     }
     if ($missing.Count) { throw "Unbundled non-system runtime dependencies: $($missing -join ', ')" }
     if (-not (Test-Path (Join-Path $Output 'swiftCore.dll'))) { throw 'Swift runtime was not bundled' }
+    if ($external.Count) {
+        @('Requires the matching installed Windows App Runtime:', ($external -join ', ')) | Set-Content (Join-Path $Output 'RuntimePrerequisites.txt')
+        Write-Host "Documented Windows App Runtime prerequisite: $($external -join ', ')"
+    }
     Write-Host "Validated runtime import closure for $($seen.Count) executable/DLL files."
     return $roots
 }
