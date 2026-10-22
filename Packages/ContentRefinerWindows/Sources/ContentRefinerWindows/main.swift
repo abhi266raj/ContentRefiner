@@ -1,5 +1,5 @@
 import SwiftCrossUI
-import DefaultBackend
+import WinUIBackend
 import ContentRefinerBase
 @main struct ContentRefinerWindowsApp: App {
     @State var model = RefinerAppModel()

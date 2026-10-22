@@ -1,5 +1,5 @@
 import SwiftCrossUI
-import DefaultBackend
+import GtkBackend
 import ContentRefinerBase
 @main struct ContentRefinerLinuxApp: App {
     @State var model = RefinerAppModel()
