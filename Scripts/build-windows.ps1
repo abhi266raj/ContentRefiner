@@ -19,4 +19,24 @@ Get-ChildItem $products -Directory | Where-Object { $_.Name -like '*.resources' 
 Copy-Item Assets/ContentRefiner.png, Assets/ContentRefiner.ico $output
 Copy-Item LICENSE, THIRD_PARTY_NOTICES.md $output
 'Run ContentRefinerWindows.exe. A matching Windows App Runtime for SwiftCrossUI WinUIBackend must be installed; see README.' | Set-Content "$output/README.txt"
+$notices = Join-Path $output 'ThirdPartyNotices'
+New-Item -ItemType Directory -Force $notices | Out-Null
+Copy-Item ThirdPartyNotices (Join-Path $notices 'ProjectNotices') -Recurse -Force
+Get-ChildItem "$package/.build/checkouts" -Directory | ForEach-Object {
+    $dependency = $_
+    $licenseFiles = Get-ChildItem $dependency.FullName -File | Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)([.\-]|$)' }
+    if ($licenseFiles) {
+        $destination = Join-Path $notices $dependency.Name
+        New-Item -ItemType Directory -Force $destination | Out-Null
+        $licenseFiles | Copy-Item -Destination $destination
+    }
+}
+if (Test-Path $swiftRoot) {
+    Get-ChildItem $swiftRoot -Recurse -File | Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)([.\-]|$)' } | ForEach-Object {
+        $relative = [IO.Path]::GetRelativePath($swiftRoot, $_.FullName)
+        $destination = Join-Path (Join-Path $notices 'SwiftRuntime') $relative
+        New-Item -ItemType Directory -Force (Split-Path $destination) | Out-Null
+        Copy-Item $_.FullName $destination
+    }
+}
 Compress-Archive -Path "$output/*" -DestinationPath "$output.zip" -Force
