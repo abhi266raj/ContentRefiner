@@ -108,9 +108,20 @@ private struct LocalProviderBackend: RefinementBackend {
 #if os(macOS)
 import ContentRefinerBase
 public enum MacRefinerProviders {
+    private struct CodexCatalog: Decodable {
+        struct Model: Decodable { let slug: String; let visibility: String? }
+        let models: [Model]
+    }
+    private static func codexModels() -> [String] {
+        let directory = ProcessInfo.processInfo.environment["CODEX_HOME"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex")
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent("models_cache.json")),
+              let catalog = try? JSONDecoder().decode(CodexCatalog.self, from: data) else { return [] }
+        return catalog.models.filter { $0.visibility != "hide" }.map(\.slug)
+    }
     public static var options: [RefinerProviderOption] {
         LocalRefinementProvider.allCases.map { provider in
-            RefinerProviderOption(id: provider.id, title: provider.title, availability: {
+            RefinerProviderOption(id: provider.id, title: provider.title, modelIdentifiers: provider == .codex ? codexModels() : [], availability: {
                 LocalProviderConfiguration(provider: provider).availability
             }, makeBackend: { model, path in
                 LocalProviderConfiguration(provider: provider, model: model, executablePath: path).backend()

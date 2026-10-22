@@ -62,7 +62,7 @@ jobs:
         with:
           swift-version: '6.4.1'
       - name: Install GTK desktop dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev clang xvfb
+        run: sudo apt-get update && sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --no-install-recommends libgtk-4-dev clang
       - name: Deterministic SDK tests
         run: swift test
       - name: Verify portable command

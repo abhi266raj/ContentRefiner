@@ -6,11 +6,12 @@ import ContentRefinerCore
 public struct RefinerProviderOption: Identifiable, Sendable {
     public let id: String
     public let title: String
+    public let modelIdentifiers: [String]
     public let availability: @Sendable () -> String
     public let makeBackend: @Sendable (String, String) -> any RefinementBackend
-    public init(id: String, title: String, availability: @escaping @Sendable () -> String = { "Configured provider" },
+    public init(id: String, title: String, modelIdentifiers: [String] = [], availability: @escaping @Sendable () -> String = { "Configured provider" },
                 makeBackend: @escaping @Sendable (String, String) -> any RefinementBackend) {
-        self.id = id; self.title = title; self.availability = availability; self.makeBackend = makeBackend
+        self.id = id; self.title = title; self.modelIdentifiers = modelIdentifiers; self.availability = availability; self.makeBackend = makeBackend
     }
     public static var http: Self {
         .init(id: "http", title: "HTTP model endpoint") { model, endpoint in
@@ -53,11 +54,11 @@ public final class RefinerAppModel {
     public var error: String?
     public var showSettings = false
     public var showHistory = false
-    public var showGuidance = false
+    var editingCustomModel = false
     public var timeoutText = "90"
     public var preferences: RefinerPreferences
     public let providerOptions: [RefinerProviderOption]
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
     private var task: Task<Void, Never>?
     private var operation = UUID()
 
@@ -82,7 +83,7 @@ public final class RefinerAppModel {
     }
     public var canRefine: Bool {
         !isRunning && !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (!directive.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!turns.isEmpty && !instruction.isEmpty))
+            && (!directive.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     public var variations: [RefinementVariation] { turns.last?.result.output.variations ?? [] }
     public func saveSettings() {
@@ -102,7 +103,7 @@ public final class RefinerAppModel {
         }
         let client = RefinementClient(backends: providers, configuration: .init(timeoutSeconds: preferences.timeout, fallbackEnabled: preferences.fallbackEnabled))
         let input = ContentRefinementInput(originalContent: original, latestContent: current.isEmpty ? original : current,
-            userInstruction: directive.isEmpty ? instruction : directive, instruction: instruction,
+            userInstruction: directive.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? instruction : directive, instruction: instruction,
             variationCount: variationCount ?? 1, contentKind: contentKind ?? "auto")
         task = Task { [weak self] in
             guard let self else { return }

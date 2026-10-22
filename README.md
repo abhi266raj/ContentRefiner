@@ -136,6 +136,8 @@ Scripts/build-windows.ps1
 
 Paste/open UTF-8 text, enter a directive, then refine. Original content stays scrollable; the full revised content expands alongside it. Refine again, choose variations, edit consolidated instructions, inspect changes/attempts, and select/copy or export text. Settings saves provider order, fallback enablement, model/path/endpoint overrides and timeout. Linux/Windows use configured HTTP endpoints; Mac additionally offers CLI and on-device providers.
 
+The comparison screen keeps provider/model controls at the top and consolidated instructions editable beside the next-change editor. Codex model choices come from its local cache; other providers support their default or a custom model identifier. Provider/model/fallback choices save automatically.
+
 Mac app: macOS 26+; Apple Intelligence additionally needs supported hardware and a ready model. Linux app: desktop session and GTK 4 runtime. Windows app: matching Windows App Runtime for SwiftCrossUI's WinUI backend (see [platform instructions](Packages/README.md)). Mac release apps are ad-hoc signed, not notarized. The SDK remains independent of these GUI requirements.
 
 ## Validate

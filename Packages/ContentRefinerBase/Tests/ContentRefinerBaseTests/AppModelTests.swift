@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import Synchronization
 import ContentRefinerCore
 @testable import ContentRefinerBase
 
@@ -74,4 +75,48 @@ final class AppModelTests: XCTestCase {
         let reopened = RefinerAppModel(defaults: defaults)
         XCTAssertEqual(reopened.preferences.providers.count, 3)
     }
+    func testTopProviderModelChoicesPersistAndReachTheBackend() async {
+        let models = Mutex<[String]>([])
+        let backend = AppBackend()
+        let options: [RefinerProviderOption] = [
+            .init(id: "first", title: "First", makeBackend: { _, _ in backend }),
+            .init(id: "chosen", title: "Chosen", modelIdentifiers: ["fast", "quality"], makeBackend: { model, _ in
+                models.withLock { $0.append(model) }; return backend
+            })
+        ]
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        let model = RefinerAppModel(providers: options, defaults: defaults)
+        model.preferences.providers[1].enabled = false
+        model.selectPrimaryProvider(model.providerChoices.last)
+        model.selectPrimaryModel("quality")
+        model.setFallbackEnabled(false)
+        XCTAssertEqual(model.primaryProvider?.id, "chosen")
+        XCTAssertTrue(model.preferences.providers[0].enabled)
+        let reopened = RefinerAppModel(providers: options, defaults: defaults)
+        XCTAssertEqual(reopened.primaryModelChoice, "quality")
+        XCTAssertFalse(reopened.preferences.fallbackEnabled)
+        model.original = "Original"; model.instruction = "Preserve facts; improve clarity"
+        XCTAssertTrue(model.canRefine)
+        model.refine(); await model.waitForRefinement()
+        XCTAssertEqual(models.withLock { $0 }, ["quality"])
+        model.selectPrimaryModel("Custom model…"); model.setPrimaryModelText("private-model")
+        XCTAssertTrue(model.usesCustomModel)
+        XCTAssertEqual(RefinerAppModel(providers: options, defaults: defaults).primaryModelText, "private-model")
+    }
+
+    func testEditedConsolidatedInstructionsGuideTheNextPass() async {
+        let backend = AppBackend()
+        let model = RefinerAppModel(providers: [.init(id: "fixture", title: "Fixture", makeBackend: { _, _ in backend })], defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        model.original = "Original"; model.directive = "Improve"
+        model.refine(); await model.waitForRefinement()
+        model.instruction = "Keep a formal tone and preserve names"
+        model.directive = "  "
+        model.refine(); await model.waitForRefinement()
+        let inputs = await backend.inputs
+        XCTAssertEqual(inputs.count, 2)
+        XCTAssertEqual(inputs[1].instruction, "Keep a formal tone and preserve names")
+        XCTAssertEqual(inputs[1].userInstruction, inputs[1].instruction)
+        XCTAssertEqual(model.turns.count, 2)
+    }
+
 }

@@ -12,9 +12,9 @@ public struct ComparisonView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Image(Bundle.module.url(forResource: "ContentRefiner", withExtension: "png")!).resizable().frame(width: 48, height: 48)
+                Image(Bundle.module.url(forResource: "ContentRefiner", withExtension: "png")!).resizable().frame(width: 36, height: 36)
                 VStack(alignment: .leading) {
-                    Text("Content Refiner").font(.title).bold()
+                    Text("Content Refiner").font(.title2).bold()
                     Text("One original. Better with every pass.").foregroundColor(.gray)
                 }
                 Spacer()
@@ -25,11 +25,13 @@ public struct ComparisonView: View {
             if model.showSettings {
                 ProviderSettingsPanel(model: model)
             } else {
+                PrimaryProviderControls(model: model)
                 HStack {
                     Text("Content kind")
                     Picker(of: ["auto", "prose", "document", "email", "code", "script", "prompt"], selection: $model.contentKind).frame(width: 140)
                     Text("Variations")
                     Picker(of: [1, 2, 3, 4, 5], selection: $model.variationCount).frame(width: 80)
+                    Toggle("Fallback", isOn: Binding(get: { model.preferences.fallbackEnabled }, set: { model.setFallbackEnabled($0) }))
                     Spacer()
                     if !model.variations.isEmpty {
                         Text("View variation")
@@ -44,14 +46,7 @@ public struct ComparisonView: View {
                             RefinedContentPane(content: model.current).frame(maxWidth: .infinity)
                         }
                         if !model.turns.isEmpty {
-                            HStack {
-                                Button(model.showGuidance ? "Hide instructions" : "Consolidated instructions") { model.showGuidance.toggle() }
-                                Button(model.showHistory ? "Hide history" : "Changes & history (\(model.turns.count))") { model.showHistory.toggle() }
-                            }
-                            if model.showGuidance {
-                                Text("Consolidated instructions").font(.headline)
-                                TextEditor(text: $model.instruction).frame(height: 120).disabled(model.isRunning)
-                            }
+                            Button(model.showHistory ? "Hide history" : "Changes & history (\(model.turns.count))") { model.showHistory.toggle() }
                             if model.showHistory { RefinementHistoryPanel(model: model) }
                         }
                         if model.attempts.contains(where: { !$0.succeeded }) {
@@ -65,7 +60,7 @@ public struct ComparisonView: View {
                 RefinementToolbar(model: model)
             }
             if let error = model.error { Text(error).foregroundColor(.red).textSelectionEnabled() }
-        }.padding(24).frame(minWidth: 900, minHeight: 680)
+        }.padding(20).frame(minWidth: 900, minHeight: 680)
     }
 }
 
@@ -75,7 +70,7 @@ public struct OriginalContentPane: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Original content").font(.headline)
-            TextEditor(text: $model.original).frame(height: 340).disabled(model.isRunning || !model.turns.isEmpty)
+            ContentEditor(text: $model.original, height: 300).disabled(model.isRunning || !model.turns.isEmpty)
             Text(model.turns.isEmpty ? "Paste text or open a UTF-8 file." : "Original preserved. Start a new session to replace it.").foregroundColor(.gray)
         }
     }
@@ -98,8 +93,14 @@ public struct RefinementToolbar: View {
     public init(model: RefinerAppModel) { self.model = model }
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Next refinement instruction").font(.headline)
-            TextEditor(text: $model.directive).frame(height: 70).disabled(model.isRunning)
+            HStack(alignment: .top, spacing: 20) {
+                ConsolidatedInstructionsPane(model: model).frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Next change").font(.headline)
+                    ContentEditor(text: $model.directive, height: 76).disabled(model.isRunning)
+                    Text("Describe what to improve in this pass.").foregroundColor(.gray)
+                }.frame(maxWidth: .infinity)
+            }
             HStack {
                 Button(model.turns.isEmpty ? "Refine" : "Refine again") { model.refine() }.disabled(!model.canRefine)
                 if model.isRunning { ProgressView(); Button("Cancel") { model.cancel() } }
@@ -125,6 +126,18 @@ public struct RefinementHistoryPanel: View {
                 }
                 Divider()
             }
+        }
+    }
+}
+
+public struct ConsolidatedInstructionsPane: View {
+    @Bindable private var model: RefinerAppModel
+    public init(model: RefinerAppModel) { self.model = model }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Consolidated instructions").font(.headline)
+            ContentEditor(text: $model.instruction, height: 76).disabled(model.isRunning)
+            Text("Updated after each pass. Edit these rules for the next pass.").foregroundColor(.gray)
         }
     }
 }
