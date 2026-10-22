@@ -22,6 +22,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <key>CFBundleIdentifier</key><string>com.abhi266raj.ContentRefinerMac</string>
 <key>CFBundleName</key><string>Content Refiner</string>
 <key>CFBundleExecutable</key><string>ContentRefiner</string>
+<key>CFBundleIconFile</key><string>ContentRefiner</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$version</string>
 <key>CFBundleVersion</key><string>1</string>
@@ -34,6 +35,7 @@ while IFS= read -r -d "" resource; do /usr/bin/ditto "$resource" "$app/Contents/
 Scripts/collect-notices.sh "$package/.build/checkouts" "$app/Contents/Resources/ThirdPartyNotices"
 cp LICENSE THIRD_PARTY_NOTICES.md "$app/Contents/Resources/"
 /usr/bin/ditto ThirdPartyNotices "$app/Contents/Resources/ThirdPartyNotices/ProjectNotices"
+cp Assets/ContentRefiner.icns "$app/Contents/Resources/"
 codesign --force --sign - "$app/Contents/Frameworks/AgentAtom.framework"
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"

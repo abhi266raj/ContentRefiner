@@ -1,3 +1,5 @@
+<img src="Assets/ContentRefiner.png" width="96" alt="Content Refiner logo">
+
 # ContentRefiner
 
 A UI-free Swift SDK for refining any text, plus **one shared SwiftCrossUI comparison app** released for Mac, Linux and Windows.

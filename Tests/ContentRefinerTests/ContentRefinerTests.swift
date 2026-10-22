@@ -3,7 +3,9 @@ import Foundation
 import XCTest
 import Synchronization
 #if canImport(ContentRefinerSource)
+#if canImport(AgentAtomSource)
 import AgentAtomSource
+#endif
 @testable import ContentRefinerSource
 #else
 @testable import ContentRefiner

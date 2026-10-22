@@ -56,7 +56,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: swift-actions/setup-swift@v2
         with:
-          swift-version: '6.4.1'
+          swift-version: '6.2.3'
       - name: Install GTK desktop dependencies
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev clang xvfb
       - name: Deterministic SDK tests
