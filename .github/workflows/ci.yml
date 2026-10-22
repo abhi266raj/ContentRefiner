@@ -56,6 +56,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Import official Swift signing keys
+        run: curl --fail --silent --show-error --location --retry 3 https://www.swift.org/keys/all-keys.asc | gpg --import -
       - uses: swift-actions/setup-swift@v3
         with:
           swift-version: '6.4.1'
