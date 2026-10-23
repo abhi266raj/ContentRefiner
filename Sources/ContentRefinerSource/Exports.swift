@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import ContentRefinerCore
+public typealias ContentRefinementInput = ContentRefinerCore.ContentRefinementInput
+public typealias RefinementVariation = ContentRefinerCore.RefinementVariation
+public typealias RefinementIssue = ContentRefinerCore.RefinementIssue
+public typealias ContentRefinementOutput = ContentRefinerCore.ContentRefinementOutput
+public typealias RefinementAttempt = ContentRefinerCore.RefinementAttempt
+public typealias RefinementResult = ContentRefinerCore.RefinementResult
+public typealias ContentRefinerError = ContentRefinerCore.ContentRefinerError
+public typealias RefinementBackend = ContentRefinerCore.RefinementBackend
+public typealias RefinementEvent = ContentRefinerCore.RefinementEvent
+public typealias RefinementConfiguration = ContentRefinerCore.RefinementConfiguration
+public typealias RefinementClient = ContentRefinerCore.RefinementClient
+public typealias RefinementTurn = ContentRefinerCore.RefinementTurn
+public typealias RefinementSnapshot = ContentRefinerCore.RefinementSnapshot
+public typealias RefinementSession = ContentRefinerCore.RefinementSession
+public typealias RefinementRules = ContentRefinerCore.RefinementRules
+public typealias ContentRefinerVersion = ContentRefinerCore.ContentRefinerVersion
+public typealias HTTPRefinementBackend = ContentRefinerCore.HTTPRefinementBackend

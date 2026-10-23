@@ -1,0 +1,24 @@
+{
+  "originHash" : "97f4957c491507ce0556a8966ff5ff7a1aa6f81d0f869d832bf8df8affa2914b",
+  "pins" : [
+    {
+      "identity" : "agentatom",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/abhi266raj/AgentAtom.git",
+      "state" : {
+        "revision" : "df95fa03457ab53b72bbdce951ff6839632f53dc",
+        "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "typedecoder",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Kitura/TypeDecoder.git",
+      "state" : {
+        "revision" : "fd1e4909a065e9ca083c9dd01048d8070c9cefdd",
+        "version" : "2.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}

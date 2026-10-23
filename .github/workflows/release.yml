@@ -1,0 +1,51 @@
+name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: content-refiner-release
+  cancel-in-progress: false
+jobs:
+  release:
+    name: Promote verified platform builds
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check version increases
+        id: versions
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          changes="$(ruby Scripts/versions.rb "$BEFORE")"
+          if [ "$changes" = '[]' ]; then echo 'release=false' >> "$GITHUB_OUTPUT"; else echo 'release=true' >> "$GITHUB_OUTPUT"; fi
+      - name: Verify tested source and artifacts
+        if: steps.versions.outputs.release == 'true'
+        id: verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          verified_run="$(Scripts/verified-pr-build.sh)"
+          echo "run=$verified_run" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        if: steps.versions.outputs.release == 'true'
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.verified.outputs.run }}
+          pattern: ContentRefiner*-dist
+          path: dist
+          merge-multiple: true
+      - name: Publish immutable source tags and verified artifacts
+        if: steps.versions.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: Scripts/release.sh "$BEFORE"

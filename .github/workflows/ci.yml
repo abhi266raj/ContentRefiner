@@ -1,0 +1,101 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: content-refiner-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  mac:
+    name: Mac SDK and shared app
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check independent component versions
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: ruby Scripts/versions.rb "$BASE"
+      - name: Check release rules and SDK UI boundary
+        run: Scripts/test-release.sh
+      - name: Deterministic SDK tests
+        run: swift test
+      - name: Verify public SDK products as isolated consumers
+        run: Scripts/verify-products.sh
+      - name: Shared app-model tests
+        run: swift test --package-path Packages/ContentRefinerBase -c release
+      - name: Mac startup regression tests
+        run: swift test --package-path Packages/ContentRefinerMac -c release
+      - name: Build and package shared comparison app
+        run: Scripts/build-app.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContentRefinerMac-dist
+          path: |
+            dist/*.zip
+            dist/*.dmg
+  linux:
+    name: Linux SDK and shared app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import official Swift signing keys
+        run: curl --compressed --fail --silent --show-error --location --retry 3 https://www.swift.org/keys/all-keys.asc | gpg --import -
+      - uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: '6.4.1'
+      - name: Install GTK desktop dependencies
+        timeout-minutes: 10
+        run: |
+          sudo apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 update
+          sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 install -y --no-install-recommends libgtk-4-dev libcurl4-openssl-dev clang xvfb xauth
+      - name: Deterministic SDK tests
+        run: swift test
+      - name: Verify portable command
+        run: swift run content-refiner --help
+      - name: Shared app-model tests
+        run: swift test --package-path Packages/ContentRefinerBase -c release
+      - name: Build Linux shared comparison app
+        run: Scripts/build-portable.sh Linux
+      - name: Smoke-test packaged Linux app
+        run: Scripts/smoke-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContentRefinerLinux-dist
+          path: dist/*.tar.gz
+  windows:
+    name: Windows SDK and shared app
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: seanmiddleditch/gha-setup-vsdevenv@v5
+      - uses: compnerd/gha-setup-swift@v0.5.1
+        with:
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
+      - name: Deterministic SDK tests
+        shell: pwsh
+        run: swift test
+      - name: Verify portable command
+        shell: pwsh
+        run: swift run content-refiner --help
+      - name: Validate standalone Windows runtime packaging
+        shell: pwsh
+        run: Scripts/test-windows-runtime.ps1
+      - name: Shared app-model tests
+        shell: pwsh
+        run: swift test --package-path Packages/ContentRefinerBase -c release
+      - name: Build Windows shared comparison app
+        shell: pwsh
+        run: Scripts/build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContentRefinerWindows-dist
+          path: dist/*.zip
