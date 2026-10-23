@@ -7,7 +7,7 @@ public struct ProviderSettingsPanel: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Providers & fallback").font(.title2)
-            Text("Enabled providers run in this order. Failed or timed-out attempts use the next provider.")
+            Text("The selected provider runs first. A fallback joins only if it fails or stalls; the first complete, validated result wins.")
             Toggle("Try fallback providers automatically", isOn: $model.preferences.fallbackEnabled)
             HStack { Text("Timeout per provider (seconds)"); TextField("90", text: $model.timeoutText).frame(width: 100) }
             ScrollView {
@@ -21,7 +21,7 @@ public struct ProviderSettingsPanel: View {
                                 Button("Up") { model.preferences.providers.swapAt(index, index - 1) }.disabled(index == 0)
                                 Button("Down") { model.preferences.providers.swapAt(index, index + 1) }.disabled(index + 1 == model.preferences.providers.count)
                             }
-                            Text(model.providerOptions.first { $0.id == model.preferences.providers[index].providerID }?.availability() ?? "Unknown provider").foregroundColor(.gray)
+                            Text(model.providerOptions.first { $0.id == model.preferences.providers[index].providerID }.map { model.availability(for: $0) } ?? "Unknown provider").foregroundColor(.gray)
                             if model.preferences.providers[index].providerID != "apple" {
                                 TextField("Model (provider default if blank)", text: $model.preferences.providers[index].model)
                                 TextField(model.preferences.providers[index].providerID == "http" ? "Full chat-completions URL" : "Executable path (auto-detect if blank)", text: $model.preferences.providers[index].endpoint)

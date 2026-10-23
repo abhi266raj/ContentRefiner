@@ -58,6 +58,7 @@ public final class RefinerAppModel {
     public var timeoutText = "90"
     public var preferences: RefinerPreferences
     public let providerOptions: [RefinerProviderOption]
+    private var availabilityCache: [String: String] = [:]
     let defaults: UserDefaults
     private var task: Task<Void, Never>?
     private var operation = UUID()
@@ -81,6 +82,17 @@ public final class RefinerAppModel {
         self.preferences = preferences
         self.timeoutText = String(Int(preferences.timeout))
     }
+    /// Availability is probed once per provider and kept in memory: probing
+    /// scans the filesystem for CLIs and, for Apple Intelligence, constructs a
+    /// session, so it must never run inside a view render. Saving settings
+    /// clears the cache so changed paths are re-probed.
+    public func availability(for option: RefinerProviderOption) -> String {
+        if let cached = availabilityCache[option.id] { return cached }
+        let value = option.availability()
+        availabilityCache[option.id] = value
+        return value
+    }
+    public func refreshAvailability() { availabilityCache = [:] }
     public var canRefine: Bool {
         !isRunning && !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && (!directive.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -90,6 +102,7 @@ public final class RefinerAppModel {
         guard let timeout = Double(timeoutText), timeout.isFinite, (5...3600).contains(timeout),
               preferences.providers.contains(where: \.enabled) else { error = "Enable a provider and choose a timeout from 5 to 3600 seconds."; return }
         preferences.timeout = timeout
+        refreshAvailability()
         do {
             defaults.set(try JSONEncoder().encode(preferences), forKey: "ContentRefiner.preferences")
             error = nil; showSettings = false; status = "Settings saved for the next request"

@@ -65,6 +65,20 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(RefinerAppModel(providers: options, defaults: defaults).preferences.timeout, 20)
     }
 
+    func testAvailabilityIsProbedOnceAndCachedUntilSettingsSave() {
+        let probes = Mutex(0)
+        let option = RefinerProviderOption(id: "fixture", title: "Fixture", availability: {
+            probes.withLock { $0 += 1 }; return "Ready"
+        }, makeBackend: { _, _ in AppBackend() })
+        let model = RefinerAppModel(providers: [option], defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        XCTAssertEqual(model.availability(for: option), "Ready")
+        XCTAssertEqual(model.availability(for: option), "Ready")
+        XCTAssertEqual(probes.withLock { $0 }, 1)
+        model.saveSettings()
+        XCTAssertEqual(model.availability(for: option), "Ready")
+        XCTAssertEqual(probes.withLock { $0 }, 2)
+    }
+
     func testMultipleHTTPFallbacksKeepTheirTypeAndUniqueIDs() {
         let defaults = UserDefaults(suiteName: UUID().uuidString)!
         let model = RefinerAppModel(defaults: defaults)
