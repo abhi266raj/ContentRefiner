@@ -82,7 +82,7 @@ public struct PrimaryProviderControls: View {
                 }
                 Spacer()
             }
-            Text(model.primaryOption?.availability() ?? "Configure a provider in Settings").foregroundColor(.gray)
+            Text(model.primaryOption.map { model.availability(for: $0) } ?? "Configure a provider in Settings").foregroundColor(.gray)
         }.disabled(model.isRunning)
     }
 }

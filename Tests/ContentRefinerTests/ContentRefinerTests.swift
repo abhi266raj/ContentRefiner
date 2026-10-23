@@ -32,11 +32,11 @@ private actor Backend: RefinementBackend {
 }
 
 private actor GateBackend: RefinementBackend {
-    let id = "gate"
+    let id: String
     let raw: String
     private var pending: CheckedContinuation<Void, Never>?
     private var waiting: CheckedContinuation<Void, Never>?
-    init(raw: String) { self.raw = raw }
+    init(raw: String, id: String = "gate") { self.raw = raw; self.id = id }
     func refine(_ input: ContentRefinementInput) async throws -> String {
         await withCheckedContinuation { pending = $0; waiting?.resume(); waiting = nil }
         return raw
@@ -82,7 +82,7 @@ final class ContentRefinerTests: XCTestCase {
 
     #endif
 
-    func testFallbackAfterUnavailableMalformedAndInvalidVariationCount() async throws {
+    func testFallbackEscalatesThroughFailuresInOrder() async throws {
         let bad = Backend("offline", fail: true)
         let malformed = Backend("malformed", raw: "not json")
         let incomplete = Backend("incomplete", raw: try response(["Only one"]))
@@ -90,10 +90,26 @@ final class ContentRefinerTests: XCTestCase {
         let input = ContentRefinementInput(originalContent: "Original", userInstruction: "Improve", variationCount: 2)
         let result = try await RefinementClient(backends: [bad, malformed, incomplete, good]).refine(input)
         XCTAssertEqual(result.providerID, "good")
+        // Attempts are reported in provider declaration order.
+        XCTAssertEqual(result.attempts.map(\.providerID), ["offline", "malformed", "incomplete", "good"])
         XCTAssertEqual(result.attempts.map(\.succeeded), [false, false, false, true])
         XCTAssertEqual(result.output.variations.count, 2)
         let goodInputs = await good.inputs
         XCTAssertEqual(goodInputs, [input])
+    }
+
+    func testFallbackJoinsAfterPrimaryStallsAndWins() async throws {
+        let slow = Backend("slow", raw: try response(["Slow"]), delay: .seconds(30))
+        let fast = Backend("fast", raw: try response(["Fast"]))
+        let start = Date()
+        let result = try await RefinementClient(backends: [slow, fast], configuration: .init(hedgeDelaySeconds: 0.05))
+            .refine(.init(originalContent: "Original", userInstruction: "Improve"))
+        XCTAssertLessThan(Date().timeIntervalSince(start), 10)
+        XCTAssertEqual(result.providerID, "fast")
+        XCTAssertEqual(result.output.variations.first?.content, "Fast")
+        let slowAttempt = try XCTUnwrap(result.attempts.first { $0.providerID == "slow" })
+        XCTAssertFalse(slowAttempt.succeeded)
+        XCTAssertTrue(slowAttempt.message.contains("Superseded"))
     }
 
     func testFallbackCanBeDisabledAndFailuresAreExplicit() async throws {
@@ -110,29 +126,53 @@ final class ContentRefinerTests: XCTestCase {
         XCTAssertTrue(inputs.isEmpty)
     }
 
-    func testTimeoutUsesNextProvider() async throws {
+    func testReadyProviderWinsWithoutWaitingForSlowProviderTimeout() async throws {
         let slow = Backend("slow", raw: try response(), delay: .seconds(60))
         let ready = Backend("ready", raw: try response())
         let result = try await RefinementClient(backends: [slow, ready], configuration: .init(timeoutSeconds: 0.01))
             .refine(.init(originalContent: "Original", userInstruction: "Improve"))
         XCTAssertEqual(result.providerID, "ready")
-        XCTAssertTrue(result.attempts[0].message.contains("timed out"))
     }
 
-    func testCancellationNeverFallsBackOrCommitsLateContent() async throws {
+    func testTimeoutBoundsEveryProviderWhenNoneRespond() async throws {
+        let first = Backend("first", raw: try response(), delay: .seconds(60))
+        let second = Backend("second", raw: try response(), delay: .seconds(60))
+        do {
+            _ = try await RefinementClient(backends: [first, second], configuration: .init(timeoutSeconds: 0.01))
+                .refine(.init(originalContent: "Original", userInstruction: "Improve"))
+            XCTFail("All providers timed out")
+        } catch ContentRefinerError.allProvidersFailed(let attempts) {
+            XCTAssertEqual(attempts.map(\.providerID), ["first", "second"])
+            XCTAssertTrue(attempts.allSatisfy { $0.message.contains("timed out") })
+        }
+    }
+
+    func testHealthyPrimaryNeverStartsFallback() async throws {
+        let primary = Backend("primary", raw: try response(["Primary"]))
+        let fallback = Backend("fallback", raw: try response(["Fallback"]))
+        let result = try await RefinementClient(backends: [primary, fallback])
+            .refine(.init(originalContent: "Original", userInstruction: "Improve"))
+        XCTAssertEqual(result.providerID, "primary")
+        XCTAssertEqual(result.attempts.map(\.providerID), ["primary"])
+        let fallbackInputs = await fallback.inputs
+        XCTAssertTrue(fallbackInputs.isEmpty)
+    }
+
+    func testCancellationDiscardsEveryProviderAndCommitsNothing() async throws {
         let gate = GateBackend(raw: try response())
-        let fallback = Backend("fallback", raw: try response())
-        let session = try RefinementSession(originalContent: "Original", client: .init(backends: [gate, fallback]))
+        let fallbackGate = GateBackend(raw: try response(), id: "fallback-gate")
+        let session = try RefinementSession(originalContent: "Original",
+                                            client: .init(backends: [gate, fallbackGate], configuration: .init(hedgeDelaySeconds: 0.05)))
         let running = Task { try await session.refine("Improve") }
         await gate.waitUntilRunning()
+        await fallbackGate.waitUntilRunning()
         running.cancel()
         await gate.release()
+        await fallbackGate.release()
         do { _ = try await running.value; XCTFail("Cancelled refinement must fail") } catch is CancellationError {}
         let snapshot = await session.snapshot
         XCTAssertEqual(snapshot.latestContent, "Original")
         XCTAssertTrue(snapshot.turns.isEmpty)
-        let fallbackInputs = await fallback.inputs
-        XCTAssertTrue(fallbackInputs.isEmpty)
     }
 
     func testIterativeSessionPreservesOriginalAndUsesSelectedVariationAndGuidance() async throws {
@@ -172,6 +212,11 @@ final class ContentRefinerTests: XCTestCase {
             _ = try await RefinementClient(backends: [backend], configuration: .init(timeoutSeconds: .nan))
                 .refine(.init(originalContent: "Original", userInstruction: "Improve"))
             XCTFail("NaN timeout")
+        } catch ContentRefinerError.invalidInput {}
+        do {
+            _ = try await RefinementClient(backends: [backend], configuration: .init(hedgeDelaySeconds: .infinity))
+                .refine(.init(originalContent: "Original", userInstruction: "Improve"))
+            XCTFail("Infinite hedge delay")
         } catch ContentRefinerError.invalidInput {}
         let inputs = await backend.inputs
         XCTAssertTrue(inputs.isEmpty)
